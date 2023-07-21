@@ -1,0 +1,42 @@
+service: bites-ai
+
+provider:
+  name: aws
+  runtime: nodejs18.x
+  timeout: 30
+
+iamRoleStatements:
+  - Effect: Allow
+    Action:
+      - ssm:GetParameter
+    Resource: '*'
+
+functions:
+  postFood:
+    memory: 512
+    timeout: 10
+    handler: handlers/calorieCounter.handler
+    events: 
+      - http: 
+          path: food
+          method: post
+          cors: true
+          authorizer:
+            arn: ${self:custom.cognitoUserPoolARN}
+  
+  postBMR:
+    memory: 512
+    timeout: 10
+    handler: handlers/BMRCalculator.handler
+    events: 
+      - http: 
+          path: BMR
+          method: post
+          cors: true
+          authorizer:
+            arn: ${self:custom.cognitoUserPoolARN}
+
+    
+
+custom: 
+  cognitoUserPoolARN: arn:aws:cognito-idp:us-east-1:947052173275:userpool/us-east-1_5ODQ4aPcs
