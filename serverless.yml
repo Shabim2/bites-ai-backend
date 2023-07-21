@@ -23,18 +23,6 @@ functions:
           cors: true
           authorizer:
             arn: ${self:custom.cognitoUserPoolARN}
-  
-  postBMR:
-    memory: 512
-    timeout: 10
-    handler: handlers/BMRCalculator.handler
-    events: 
-      - http: 
-          path: BMR
-          method: post
-          cors: true
-          authorizer:
-            arn: ${self:custom.cognitoUserPoolARN}
 
     
 
