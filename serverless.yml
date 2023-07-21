@@ -23,7 +23,17 @@ functions:
           cors: true
           authorizer:
             arn: ${self:custom.cognitoUserPoolARN}
-
+  appleWatchParse:
+    memory: 1024
+    timeout: 600
+    handler: handlers/parse/apple-health-data-parser.handler
+    events:
+       - s3:
+          bucket: bites-ai-dev
+          event: s3:ObjectCreated:*
+          rules:
+          - prefix: xml/
+          - suffix: .xml
     
 
 custom: 
