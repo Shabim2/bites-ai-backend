@@ -14,8 +14,30 @@ iamRoleStatements:
     Action: 
       - s3:*
     Resource: '*'
+  - Effect: Allow
+    Action:
+      - "dynamodb:PutItem"
+      - "dynamodb:GetItem"
+      - "dynamodb:UpdateItem"
+      - "dynamodb:DeleteItem"
+      - "dynamodb:Query"
+      - "dynamodb:Scan"
+    Resource:
+      - Fn::GetAtt: [BitesData, Arn]
+      - "arn:aws:dynamodb:us-east-1:947052173275:table/bites-user-data-dev/index/*"
 
 functions:
+  postUserData:
+    memory: 512
+    timeout: 10
+    handler: handlers/userData.handler
+    events: 
+      - http: 
+          path: data
+          method: post
+          cors: true
+          authorizer:
+            arn: ${self:custom.cognitoUserPoolARN}
   postFood:
     memory: 512
     timeout: 10
@@ -39,6 +61,24 @@ functions:
           rules:
           - prefix: xml/
           - suffix: .xml
+
+  resources:
+    Resources:
+      BitesData:
+        Type: "AWS::DynamoDB::Table"
+        Properties:
+          AttributeDefinitions:
+          - AttributeName: "PK"
+            AttributeType: "S"
+          - AttributeName: "SK"
+            AttributeType: "S"
+          KeySchema:
+          - AttributeName: "PK"
+            KeyType: "HASH"
+          - AttributeName: "SK"
+            KeyType: "RANGE"
+          BillingMode: PAY_PER_REQUEST
+          TableName: bites-user-data-dev
     
 
 custom: 

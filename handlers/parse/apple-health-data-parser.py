@@ -174,6 +174,8 @@ class HealthDataExtractor(object):
             bucket_name = 'bites-ai-dev'
             key = '%s.csv' % abbreviate(record_type)
 
+            header = 'activity,unit,endtime,starttime,time,value\n'  # Header row
+
             with tempfile.NamedTemporaryFile(mode='wb', delete=False) as temp_file:
                 # Create a temporary file to store the CSV rows for the current record type
                 for node in self.nodes:
@@ -188,6 +190,10 @@ class HealthDataExtractor(object):
 
                         # Join the remaining values back into a CSV row and write to the file
                         cleaned_csv_row = b','.join(row_values) + b'\n'
+
+                        if temp_file.tell() == 0:
+                            temp_file.write(header.encode('utf-8'))
+                            
                         temp_file.write(cleaned_csv_row)
 
             # Upload the temporary file to S3
