@@ -1,6 +1,7 @@
 import os
 import re
 import sys
+import boto3
 
 from xml.etree import ElementTree
 from collections import Counter, OrderedDict
@@ -103,18 +104,17 @@ class HealthDataExtractor(object):
         directory as the input export.xml. Reports each file written
         unless verbose has been set to False.
     """
-    def __init__(self, path, verbose=VERBOSE):
-        self.in_path = path
+    def __init__(self, file, verbose=VERBOSE):
         self.verbose = verbose
-        self.directory = os.path.abspath(os.path.split(path)[0])
-        with open(path) as f:
-            self.report('Reading data from %s . . . ' % path, end='')
-            self.data = ElementTree.parse(f)
-            self.report('done')
-        self.root = self.data._root
+        self.report('Reading data from')
+        self.data = ElementTree.fromstring(file)
+        self.report('done')
+        self.root = self.data
         self.nodes = list(self.root)
         self.n_nodes = len(self.nodes)
+        print('HERE')
         self.abbreviate_types()
+        print('HERE')
         self.collect_stats()
 
     def report(self, msg, end='\n'):
@@ -160,16 +160,30 @@ class HealthDataExtractor(object):
         self.count_tags_and_fields()
 
     def open_for_writing(self):
+        # self.handles = {}
+        # self.paths = []
+        # for kind in (list(self.record_types) + list(self.other_types)):
+        #     path = os.path.join(self.directory, '%s.csv' % abbreviate(kind))
+        #     f = open(path, 'w')
+        #     headerType = (kind if kind in ('Workout', 'ActivitySummary')
+        #                        else 'Record')
+        #     f.write(','.join(FIELDS[headerType].keys()) + '\n')
+        #     self.handles[kind] = f
+        #     self.report('Opening %s for writing' % path)
         self.handles = {}
         self.paths = []
         for kind in (list(self.record_types) + list(self.other_types)):
-            path = os.path.join(self.directory, '%s.csv' % abbreviate(kind))
-            f = open(path, 'w')
-            headerType = (kind if kind in ('Workout', 'ActivitySummary')
-                               else 'Record')
-            f.write(','.join(FIELDS[headerType].keys()) + '\n')
-            self.handles[kind] = f
-            self.report('Opening %s for writing' % path)
+            key = '%s.csv' % abbreviate(kind)
+            headerType = (kind if kind in ('Workout', 'ActivitySummary') else 'Record')
+            header = ','.join(FIELDS[headerType].keys()) + '\n'
+            self.handles[kind] = header  # Store the headers temporarily in memory
+            self.report('Opening %s for writing' % key)
+
+        # Upload the headers to S3
+        for kind, header in self.handles.items():
+            key = '%s.csv' % abbreviate(kind)
+            bucket_name = 'bites-ai-dev'
+            s3_client.put_object(Bucket=bucket_name, Key=key, Body=header)
 
     def abbreviate_types(self):
         """
@@ -181,35 +195,107 @@ class HealthDataExtractor(object):
                     node.attrib['type'] = abbreviate(node.attrib['type'])
 
     def write_records(self):
+        # kinds = FIELDS.keys()
+        # for node in self.nodes:
+        #     if node.tag in kinds:
+        #         attributes = node.attrib
+        #         kind = attributes['type'] if node.tag == 'Record' else node.tag
+        #         values = [format_value(attributes.get(field), datatype)
+        #                   for (field, datatype) in FIELDS[node.tag].items()]
+        #         line = ','.join(values) + '\n'
+        #         self.handles[kind].write(line)
         kinds = FIELDS.keys()
         for node in self.nodes:
             if node.tag in kinds:
                 attributes = node.attrib
                 kind = attributes['type'] if node.tag == 'Record' else node.tag
-                values = [format_value(attributes.get(field), datatype)
-                          for (field, datatype) in FIELDS[node.tag].items()]
+                values = [format_value(attributes.get(field), datatype) for (field, datatype) in FIELDS[node.tag].items()]
                 line = ','.join(values) + '\n'
-                self.handles[kind].write(line)
+                self.handles[kind] += line
 
     def close_files(self):
-        for (kind, f) in self.handles.items():
-            f.close()
-            self.report('Written %s data.' % abbreviate(kind))
+        # for (kind, f) in self.handles.items():
+        #     f.close()
+        #     self.report('Written %s data.' % abbreviate(kind))
+        self.report('Data extraction completed.')
 
+
+    def write_csv_to_s3(bucket_name, object_key, csv_data):
+        # Prepare the CSV data as a string
+        csv_string = '\n'.join([','.join(row) for row in csv_data])
+
+        try:
+            # Upload the CSV data to S3
+            s3_client.put_object(Bucket=bucket_name, Key=object_key, Body=csv_string)
+            return True
+        except Exception as e:
+            print("Error:", e)
+            return False
+    
     def extract(self):
-        self.open_for_writing()
-        self.write_records()
-        self.close_files()
+        csv_data = {}
+        
+        # Assuming self.record_types and self.other_types are already populated with record types
+        
+        for kind in (list(self.record_types) + list(self.other_types)):
+            csv_data[kind] = []  # Initialize a list to store CSV data for each record type
+        
+        for node in self.nodes:
+            if node.tag in csv_data:
+                attributes = node.attrib
+                kind = attributes['type'] if node.tag == 'Record' else node.tag
+                values = [format_value(attributes.get(field), datatype) for (field, datatype) in FIELDS[node.tag].items()]
+                csv_data[kind].append(values)
+        
+        # Upload each CSV to S3
+        bucket_name = 'bites-ai-dev'
+        for kind, data in csv_data.items():
+            print(kind)
+            print(data)
+            key = '%s.csv' % abbreviate(kind)
+            csv_string = '\n'.join([','.join(row) for row in data])
+            s3_client.put_object(Bucket=bucket_name, Key=key, Body=csv_string)
+
+        self.report('Data extraction completed.')
+
+    # def extract(self):
+    #     self.open_for_writing()
+    #     self.write_records()
+    #     self.close_files()
 
     def report_stats(self):
         print('\nTags:\n%s\n' % format_freqs(self.tags))
         print('Fields:\n%s\n' % format_freqs(self.fields))
         print('Record types:\n%s\n' % format_freqs(self.record_types))
 
-
+s3_client = boto3.client("s3")
 	
 def handler(event, context):
-    print(event)
-    # data = HealthDataExtractor(event)
-    # data.report_stats()
-    # data.extract()
+    bucket_name = event['Records'][0]['s3']['bucket']['name']
+    object_key = event['Records'][0]['s3']['object']['key']
+    # Create a Boto3 S3 client
+    s3_client = boto3.client('s3')
+    try:
+        # Read the contents of the S3 object
+        response = s3_client.get_object(Bucket=bucket_name, Key=object_key)
+        file_contents = response['Body'].read().decode('utf-8')
+        # Process the file_contents here (e.g., perform some operations)
+
+        # Print the file contents (you can replace this with your desired processing logic)
+
+        # Optionally, you can return the file contents if needed for further processing or integration
+
+        data = HealthDataExtractor(file_contents)
+        data.report_stats()
+        data.extract()
+        return {
+            'statusCode': 200,
+        }
+
+    except Exception as e:
+        # Handle any exceptions that may occur during the file read or processing
+        print('error', e)
+        return {
+            'statusCode': 500,
+            'body': 'Error reading or processing the file.'
+        }
