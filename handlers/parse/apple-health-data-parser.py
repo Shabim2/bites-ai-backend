@@ -2,6 +2,7 @@ import os
 import re
 import sys
 import boto3
+import tempfile
 
 from xml.etree import ElementTree
 from collections import Counter, OrderedDict
@@ -159,32 +160,6 @@ class HealthDataExtractor(object):
         self.count_record_types()
         self.count_tags_and_fields()
 
-    def open_for_writing(self):
-        # self.handles = {}
-        # self.paths = []
-        # for kind in (list(self.record_types) + list(self.other_types)):
-        #     path = os.path.join(self.directory, '%s.csv' % abbreviate(kind))
-        #     f = open(path, 'w')
-        #     headerType = (kind if kind in ('Workout', 'ActivitySummary')
-        #                        else 'Record')
-        #     f.write(','.join(FIELDS[headerType].keys()) + '\n')
-        #     self.handles[kind] = f
-        #     self.report('Opening %s for writing' % path)
-        self.handles = {}
-        self.paths = []
-        for kind in (list(self.record_types) + list(self.other_types)):
-            key = '%s.csv' % abbreviate(kind)
-            headerType = (kind if kind in ('Workout', 'ActivitySummary') else 'Record')
-            header = ','.join(FIELDS[headerType].keys()) + '\n'
-            self.handles[kind] = header  # Store the headers temporarily in memory
-            self.report('Opening %s for writing' % key)
-
-        # Upload the headers to S3
-        for kind, header in self.handles.items():
-            key = '%s.csv' % abbreviate(kind)
-            bucket_name = 'bites-ai-dev'
-            s3_client.put_object(Bucket=bucket_name, Key=key, Body=header)
-
     def abbreviate_types(self):
         """
         Shorten types by removing common boilerplate text.
@@ -194,74 +169,33 @@ class HealthDataExtractor(object):
                 if 'type' in node.attrib:
                     node.attrib['type'] = abbreviate(node.attrib['type'])
 
-    def write_records(self):
-        # kinds = FIELDS.keys()
-        # for node in self.nodes:
-        #     if node.tag in kinds:
-        #         attributes = node.attrib
-        #         kind = attributes['type'] if node.tag == 'Record' else node.tag
-        #         values = [format_value(attributes.get(field), datatype)
-        #                   for (field, datatype) in FIELDS[node.tag].items()]
-        #         line = ','.join(values) + '\n'
-        #         self.handles[kind].write(line)
-        kinds = FIELDS.keys()
-        for node in self.nodes:
-            if node.tag in kinds:
-                attributes = node.attrib
-                kind = attributes['type'] if node.tag == 'Record' else node.tag
-                values = [format_value(attributes.get(field), datatype) for (field, datatype) in FIELDS[node.tag].items()]
-                line = ','.join(values) + '\n'
-                self.handles[kind] += line
+    def extract(self, record_type):
+            # Assuming self.record_types and self.other_types are already populated with record types
+            bucket_name = 'bites-ai-dev'
+            key = '%s.csv' % abbreviate(record_type)
 
-    def close_files(self):
-        # for (kind, f) in self.handles.items():
-        #     f.close()
-        #     self.report('Written %s data.' % abbreviate(kind))
-        self.report('Data extraction completed.')
+            with tempfile.NamedTemporaryFile(mode='wb', delete=False) as temp_file:
+                # Create a temporary file to store the CSV rows for the current record type
+                for node in self.nodes:
+                    attributes = node.attrib
+                    kind = attributes['type'] if node.tag == 'Record' else node.tag
+                    if kind == record_type:
+                        values = [format_value(attributes.get(field), datatype) for (field, datatype) in FIELDS[node.tag].items()]
+                        csv_row = ','.join(values).encode('utf-8')
+
+                        # Split the row into values and skip the first three values
+                        row_values = csv_row.split(b',')[9:]
+
+                        # Join the remaining values back into a CSV row and write to the file
+                        cleaned_csv_row = b','.join(row_values) + b'\n'
+                        temp_file.write(cleaned_csv_row)
+
+            # Upload the temporary file to S3
+            s3_client.upload_file(temp_file.name, bucket_name, key)
+
+            self.report(f'CSV data for {record_type} upload completed.')
 
 
-    def write_csv_to_s3(bucket_name, object_key, csv_data):
-        # Prepare the CSV data as a string
-        csv_string = '\n'.join([','.join(row) for row in csv_data])
-
-        try:
-            # Upload the CSV data to S3
-            s3_client.put_object(Bucket=bucket_name, Key=object_key, Body=csv_string)
-            return True
-        except Exception as e:
-            print("Error:", e)
-            return False
-    
-    def extract(self):
-        csv_data = {}
-        
-        # Assuming self.record_types and self.other_types are already populated with record types
-        
-        for kind in (list(self.record_types) + list(self.other_types)):
-            csv_data[kind] = []  # Initialize a list to store CSV data for each record type
-        
-        for node in self.nodes:
-            if node.tag in csv_data:
-                attributes = node.attrib
-                kind = attributes['type'] if node.tag == 'Record' else node.tag
-                values = [format_value(attributes.get(field), datatype) for (field, datatype) in FIELDS[node.tag].items()]
-                csv_data[kind].append(values)
-        
-        # Upload each CSV to S3
-        bucket_name = 'bites-ai-dev'
-        for kind, data in csv_data.items():
-            print(kind)
-            print(data)
-            key = '%s.csv' % abbreviate(kind)
-            csv_string = '\n'.join([','.join(row) for row in data])
-            s3_client.put_object(Bucket=bucket_name, Key=key, Body=csv_string)
-
-        self.report('Data extraction completed.')
-
-    # def extract(self):
-    #     self.open_for_writing()
-    #     self.write_records()
-    #     self.close_files()
 
     def report_stats(self):
         print('\nTags:\n%s\n' % format_freqs(self.tags))
@@ -281,13 +215,15 @@ def handler(event, context):
         file_contents = response['Body'].read().decode('utf-8')
         # Process the file_contents here (e.g., perform some operations)
 
-        # Print the file contents (you can replace this with your desired processing logic)
-
         # Optionally, you can return the file contents if needed for further processing or integration
 
         data = HealthDataExtractor(file_contents)
         data.report_stats()
-        data.extract()
+
+        # Assuming self.record_types and self.other_types are already populated with record types
+        for record_type in (list(data.record_types) + list(data.other_types)):
+            data.extract(record_type)
+
         return {
             'statusCode': 200,
         }
