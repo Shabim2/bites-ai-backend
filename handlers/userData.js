@@ -26,7 +26,7 @@ module.exports.handler = async (event) => {
         const params = {
             TableName: tableName,
             Item: entryData,
-          };
+        };
     
         const response = await dynamoDB.put(params).promise();
         console.log(response)

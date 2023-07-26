@@ -169,10 +169,10 @@ class HealthDataExtractor(object):
                 if 'type' in node.attrib:
                     node.attrib['type'] = abbreviate(node.attrib['type'])
 
-    def extract(self, record_type):
+    def extract(self, record_type, object_key):
             # Assuming self.record_types and self.other_types are already populated with record types
             bucket_name = 'bites-ai-dev'
-            key = '%s.csv' % abbreviate(record_type)
+            key = '{id}/{record_type}.csv'.format(record_type = abbreviate(record_type), id = object_key[0:36])
 
             header = 'activity,unit,endtime,starttime,time,value\n'  # Header row
 
@@ -193,7 +193,7 @@ class HealthDataExtractor(object):
 
                         if temp_file.tell() == 0:
                             temp_file.write(header.encode('utf-8'))
-                            
+
                         temp_file.write(cleaned_csv_row)
 
             # Upload the temporary file to S3
@@ -228,7 +228,7 @@ def handler(event, context):
 
         # Assuming self.record_types and self.other_types are already populated with record types
         for record_type in (list(data.record_types) + list(data.other_types)):
-            data.extract(record_type)
+            data.extract(record_type, object_key)
 
         return {
             'statusCode': 200,

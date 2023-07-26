@@ -4,6 +4,9 @@ provider:
   name: aws
   runtime: nodejs18.x
   timeout: 30
+  apiGateway:
+    request:
+      payload: '200MB' # Adjust this value as needed (e.g., '5MB', '10MB')
 
   iamRoleStatements:
     - Effect: Allow
@@ -24,6 +27,9 @@ provider:
         - "dynamodb:Scan"
       Resource:
         - "arn:aws:dynamodb:us-east-1:947052173275:table/bites-user-data-dev"
+
+plugins:
+  - serverless-python-requirements  # Add the Python requirements plugin
 
 functions:
   postUserData:
@@ -48,6 +54,17 @@ functions:
           cors: true
           authorizer:
             arn: ${self:custom.cognitoUserPoolARN}
+  postWatchData:
+    memory: 512
+    timeout: 10
+    handler: handlers/postWatchData.handler
+    events:
+      - http:
+          path: watch
+          method: post
+          cors: true
+          authorizer:
+            arn: ${self:custom.cognitoUserPoolARN}
   postFood:
     memory: 512
     timeout: 10
@@ -62,15 +79,26 @@ functions:
   appleWatchParse:
     memory: 1024
     timeout: 600
-    runtime: python3.9
+    runtime: python3.10
     handler: handlers/parse/apple-health-data-parser.handler
     events:
        - s3:
           bucket: bites-ai-dev
           event: s3:ObjectCreated:*
           rules:
-          - prefix: xml/
           - suffix: .xml
+  getActiveEnergy:
+    memory: 1024
+    timeout: 600
+    runtime: python3.10
+    handler: handlers/parse/getActiveEnergyBurned.handler
+    events:
+       - http:
+          path: activeEnergy
+          method: get
+          cors: true
+          authorizer:
+            arn: ${self:custom.cognitoUserPoolARN}
   
 
 resources:
@@ -94,3 +122,5 @@ resources:
 
 custom: 
   cognitoUserPoolARN: arn:aws:cognito-idp:us-east-1:947052173275:userpool/us-east-1_5ODQ4aPcs
+  pythonRequirements:
+    dockerizePip: true  # Use Docker to package dependencies
