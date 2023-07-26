@@ -28,9 +28,6 @@ provider:
       Resource:
         - "arn:aws:dynamodb:us-east-1:947052173275:table/bites-user-data-dev"
 
-plugins:
-  - serverless-python-requirements  # Add the Python requirements plugin
-
 functions:
   postUserData:
     memory: 512
@@ -92,6 +89,8 @@ functions:
     timeout: 600
     runtime: python3.10
     handler: handlers/parse/getActiveEnergyBurned.handler
+    layers:
+      - arn:aws:lambda:us-east-1:947052173275:layer:pandaslayer:1
     events:
        - http:
           path: activeEnergy
@@ -122,5 +121,3 @@ resources:
 
 custom: 
   cognitoUserPoolARN: arn:aws:cognito-idp:us-east-1:947052173275:userpool/us-east-1_5ODQ4aPcs
-  pythonRequirements:
-    dockerizePip: true  # Use Docker to package dependencies
