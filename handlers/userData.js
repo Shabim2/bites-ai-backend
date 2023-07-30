@@ -12,7 +12,7 @@ module.exports.handler = async (event) => {
             gender,
             id
         } = JSON.parse(event.body)
-
+        console.log(event)
         const entryData = {
             // Provide the data you want to upload here, e.g., 'userId', 'timestamp', 'otherAttributes', etc.
             PK: `USER#${id}`,

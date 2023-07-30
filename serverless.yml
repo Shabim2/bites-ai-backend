@@ -90,7 +90,7 @@ functions:
     runtime: python3.10
     handler: handlers/parse/getActiveEnergyBurned.handler
     layers:
-      - arn:aws:lambda:us-east-1:947052173275:layer:pandaslayer:1
+      - arn:aws:lambda:us-east-1:947052173275:layer:pandas:1
     events:
        - http:
           path: activeEnergy

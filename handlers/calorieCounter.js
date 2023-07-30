@@ -27,10 +27,10 @@ module.exports.handler = async (event) => {
         const chatCompletion = await openai.createChatCompletion({
         model: "gpt-3.5-turbo",
         messages: [
-          {role: "system", content: "You are a concise assistant that knows only the calorie amount of different foods"},
-          {role: "user", content: `How many calories are in ${food}?, respond with only a single number, no other text`}
+          {role: "system", content: "You are a concise assistant that knows the calorie amount, the amount of protein in grams, the amount of carbs in grams, and the amount of fat in grams of a given food."},
+          {role: "user", content: `How many calories, protein, carbs, and fat does ${food} have? respond with only a json object string formatted like this {"calories":"", "protein":"", carbs:"", fats:""}`}
         ],
-        temperature: 0,
+        temperature: 1,
         max_tokens: 32,
         n: 1
         });
@@ -43,7 +43,7 @@ module.exports.handler = async (event) => {
                 'Access-Control-Allow-Headers': 'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token',
                 'Access-Control-Allow-Methods': 'OPTIONS, POST'
             },
-            body: JSON.stringify({ calories: chatCompletion.data.choices[0].message.content })
+            body: chatCompletion.data.choices[0].message.content
         }
     
     } catch (error) {
