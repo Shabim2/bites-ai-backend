@@ -73,6 +73,17 @@ functions:
           cors: true
           authorizer:
             arn: ${self:custom.cognitoUserPoolARN}
+  postFoodData:
+    memory: 512
+    timeout: 10
+    handler: handlers/postFood.handler
+    events: 
+      - http: 
+          path: foodData
+          method: post
+          cors: true
+          authorizer:
+            arn: ${self:custom.cognitoUserPoolARN}
   appleWatchParse:
     memory: 1024
     timeout: 600
