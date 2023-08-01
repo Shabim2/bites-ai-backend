@@ -28,7 +28,7 @@ module.exports.handler = async (event) => {
         model: "gpt-3.5-turbo",
         messages: [
           {role: "system", content: "You are a concise assistant that knows the calorie amount, the amount of protein in grams, the amount of carbs in grams, and the amount of fat in grams of a given food."},
-          {role: "user", content: `How many calories, protein, carbs, and fat does ${food} have? respond with only a json object string formatted like this {"calories":"", "protein":"", carbs:"", fats:""}, if you can't find the food just respond with 0 for the fields`}
+          {role: "user", content: `How many calories, protein, carbs, and fat does ${food} have? respond with only a json object string formatted like this {"calories":"", "protein":"", carbs:"", fat:""}, if you can't find the food just respond with 0 for the fields`}
         ],
         temperature: 1,
         max_tokens: 32,
