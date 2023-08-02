@@ -1,7 +1,8 @@
 import pandas as pd
 import boto3
-import csv
 import io
+from datetime import datetime, timedelta
+
 
 def handler(event, context):
     # Get the S3 bucket and object key from the API request
@@ -18,6 +19,10 @@ def handler(event, context):
 
     # Convert 'endtime' column to datetime
     df['endtime'] = pd.to_datetime(df['endtime'])
+
+    # Filter data for the last 30 days
+    last_30_days = datetime.now() - timedelta(days=30)
+    df = df[df['endtime'] >= last_30_days]
 
     # Extract the date from 'endtime' and group by date to calculate the total calories spent per day
     df['date'] = df['endtime'].dt.date
