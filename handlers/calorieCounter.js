@@ -31,7 +31,7 @@ module.exports.handler = async (event) => {
           {role: "user", content: `How many calories, protein, carbs, and fat does ${food} have? respond with only a json object string formatted like this {"calories":"", "protein":"", carbs:"", fat:""}, if you can't find the food just respond with 0 for the fields`}
         ],
         temperature: 1,
-        max_tokens: 32,
+        max_tokens:60,
         n: 1
         });
 

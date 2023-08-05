@@ -73,6 +73,17 @@ functions:
           cors: true
           authorizer:
             arn: ${self:custom.cognitoUserPoolARN}
+  postMacros:
+    memory: 512
+    timeout: 30
+    handler: handlers/postMacros.handler
+    events: 
+      - http: 
+          path: macros
+          method: post
+          cors: true
+          authorizer:
+            arn: ${self:custom.cognitoUserPoolARN}
   postFoodData:
     memory: 512
     timeout: 10
