@@ -120,6 +120,11 @@ functions:
           cors: true
           authorizer:
             arn: ${self:custom.cognitoUserPoolARN}
+  # postHealthProgram:
+  #   timeout: 600
+  #   handler: handlers/postHealthProgram.handler
+  #   url: 
+  #     cors: true
   
 
 resources:
@@ -139,6 +144,9 @@ resources:
           KeyType: "RANGE"
         BillingMode: PAY_PER_REQUEST
         TableName: bites-user-data-dev
+    # PostHealthProgramLambdaFunctionUrl:
+    #   Properties:
+    #     InvokeMode: RESPONSE_STREAM
     
 
 custom: 
